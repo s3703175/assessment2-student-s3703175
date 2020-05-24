@@ -1,0 +1,41 @@
+- name: Ansible
+  hosts: all
+  tasks:
+    - name: dl app
+      get_url:
+        url: https://github.com/servian/TechTestApp/releases/download/v.0.6.0/TechTestApp_v.0.6.0_linux64.zip
+        dest: /home/ec2-user
+    - name: Extract zip into /home/ec2-user
+      unarchive:
+        src: /home/ec2-user/TechTestApp_v.0.6.0_linux64.zip
+        dest: /home/ec2-user/
+        remote_src: yes
+    - name: conf
+      copy:
+        content: |
+          "DbUser" = "{{ username }}"
+          "DbPassword" = "{{ password }}"
+          "DbName" = "{{ name }}"
+          "DbPort" = "{{ port }}"
+          "DbHost" = "{{ endpoint }}"
+          "ListenHost" = "0.0.0.0"
+          "ListenPort" = "3000"
+        dest: "/home/ec2-user/dist/conf.toml"
+    - name: Copy the template service into /lib/systemd/system
+      become: yes
+      template:
+        src: ./templates/service.tpl
+        dest: "/lib/systemd/system/TechTestApp.service"
+    - name: reload app
+      become: yes
+      command: systemctl daemon-reload
+    - name: run app at boot
+      become: yes
+      command: systemctl enable TechTestApp
+    - name: db
+      shell:
+        cmd: ./TechTestApp updatedb -s
+        chdir: "/home/ec2-user/dist"
+    - name: run TechTestApp
+      become: yes
+      command: systemctl start TechTestApp
